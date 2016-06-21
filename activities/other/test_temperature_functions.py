@@ -18,7 +18,7 @@ dw = pd.read_excel(fn, shts[1], index_col=0, skiprows=[0,2])
 # define objective function: returns the array to be minimized
 def fcn(v, x1, x2, x3, _args):
     return calculate_coolant_temperatures(
-        _args[0], v['temperature_threshold'], _args[1], 
+        _args[0], _args[7], _args[1], 
         v['temperature_increase_when_engine_off'], v['engine_coolant_flow'], 
         v['engine_coolant_constant'], v['heat_to_engine'], 
         _args[2], _args[3], _args[4], _args[5], _args[6], 
@@ -31,7 +31,7 @@ def fcn2min(params, x1, x2, x3, data, _args):
 
 # create a set of Parameters
 params = Parameters()
-params.add('temperature_threshold', value=75)
+# params.add('temperature_threshold', value=75)
 params.add('temperature_increase_when_engine_off', value=0)
 params.add('engine_coolant_flow', value=0.015)
 params.add('engine_coolant_constant', value=0.4)
@@ -49,10 +49,12 @@ def run_main():
     engine_coolant_heat_capacity, engine_coolant_equiv_mass, engine_heat_capacity, engine_mass = \
         get_thermal_model_arguments(fuel_type, engine_max_power)
     
+    temperature_threshold = 95
     temperature_max, initial_engine_temperature = data.max(), data[0]
     _args = [temperature_max, initial_engine_temperature, \
              engine_fuel_lower_heating_value, engine_coolant_heat_capacity, \
-             engine_coolant_equiv_mass, engine_heat_capacity, engine_mass]
+             engine_coolant_equiv_mass, engine_heat_capacity, engine_mass,\
+             temperature_threshold]
 
     
     # do fit, here with leastsq model
