@@ -10,6 +10,7 @@ fn = '20160315_163135-astra_test.xlsx'
 shts = ['nedc_predictions_time_series', 'wltp_h_predictions_time_series']
 
 fn = r'D:\Work\reporting.git\activities\other\20160315_163135-astra_test.xlsx'
+# fn = r'D:\Work\reporting.git\activities\other\20160315_163135-f500_test.xlsx'
 
 d = pd.read_excel(fn, "nedc_inputs_parameters", index_col=1).Value
 dn = pd.read_excel(fn, shts[0], index_col=0, skiprows=[0,2])
@@ -19,7 +20,7 @@ dw = pd.read_excel(fn, shts[1], index_col=0, skiprows=[0,2])
 def fcn(v, x1, x2, x3, t_init):
     return calculate_coolant_temperatures(
         v['temperature_threshold'], t_init, v['temperature_increase_when_engine_off'],
-        x1, x2, x3, v['c1'], v['c2'], v['c3'], v['c4'], v['c5'], v['c6'])
+        x1, x2, x3, v['c1'], v['c2'], v['c3'], v['c4'], v['c5'], v['c6'], v['c22'])
 
 def fcn2min(params, x1, x2, x3, data, t_init):
     v = params.valuesdict()
@@ -36,12 +37,13 @@ params.add('c3', value=-0.01)
 params.add('c4', value=1)
 params.add('c5', value=0.1)
 params.add('c6', value=0.1)
+params.add('c22', value=0)
 
 def run_main():
     
     
-    x1, x2, x3 = dw.fuel_consumptions.values, dw.engine_speeds_out.values, dw.velocities.values
-    data = dw.engine_coolant_temperatures.values #.diff().fillna(0)
+    x1, x2, x3 = dw['target fuel_consumptions'].values, dw['target engine_speeds_out'].values, dw.velocities.values
+    data = dw['target engine_coolant_temperatures'].values #.diff().fillna(0)
 
     temperature_threshold = 95
     temperature_max, initial_engine_temperature = data.max(), data[0]
@@ -64,8 +66,8 @@ def run_main():
     
     
     
-    n1, n2, n3, = dn.fuel_consumptions.values, dn.engine_speeds_out.values, dn.velocities.values
-    nedc_data = dn.engine_coolant_temperatures.values
+    n1, n2, n3 = dn['target fuel_consumptions'].values, dn['target engine_speeds_out'].values, dn.velocities.values
+    nedc_data = dn['target engine_coolant_temperatures'].values 
     nedc_t_init = nedc_data[0]
     nedc_final = fcn(result.params, n1, n2, n3, nedc_t_init)
 
@@ -83,7 +85,7 @@ def run_main():
 
 def calculate_coolant_temperatures(
         temperature_threshold, initial_engine_temperature, temperature_increase_when_engine_off,
-        fuel_consumptions, engine_speeds_out, velocities, c1, c2, c3, c4, c5, c6):
+        fuel_consumptions, engine_speeds_out, velocities, c1, c2, c3, c4, c5, c6, c22):
     """
     Check CO2MPAS Parametric.
     :return:
@@ -98,12 +100,12 @@ def calculate_coolant_temperatures(
     v = velocities
 
     def calculate_dQ(
-            fc, t, tthres, v, e0, ie0, c2, c3, c4, c5, c6):
+            fc, t, tthres, v, e0, ie0, c2, c3, c4, c5, c6, c22):
         if fc <= 0:
             dQ = 0; e = e0; ie = ie0
         else:
-            dQ = c2 * fc
-            dQ -= c3 * (v/3600)**2 # Check using accelerations instead of velocities
+            dQ = c2 * fc + c22 * np.abs(t - tthres) * fc
+            dQ -= c3 * (v/3.6)**2 # Check using accelerations instead of velocities
             if t > tthres:
                 e = t - tthres
                 de = e - e0 # This will work only in 1Hz, we need time
@@ -125,7 +127,7 @@ def calculate_coolant_temperatures(
         if n[i] > 0:
             if t_ii == tthres: ie = 0
             dQ, e, ie = calculate_dQ(
-                    fc[i - 1], t_ii, tthres, v[i - 1], e, ie, c2, c3, c4, c5, c6)
+                    fc[i - 1], t_ii, tthres, v[i - 1], e, ie, c2, c3, c4, c5, c6, c22)
         
             t_i = t_ii + dQ / c1
 
