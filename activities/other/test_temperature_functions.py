@@ -16,17 +16,17 @@ dn = pd.read_excel(fn, shts[0], index_col=0, skiprows=[0,2])
 dw = pd.read_excel(fn, shts[1], index_col=0, skiprows=[0,2])
 
 # define objective function: returns the array to be minimized
-def fcn(v, x1, x2, x3, _args):
+def fcn(v, x1, x2, x3, x4, _args):
     return calculate_coolant_temperatures(
         _args[0], _args[7], _args[1], 
         v['temperature_increase_when_engine_off'], v['engine_coolant_flow'], 
         v['engine_coolant_constant'], v['heat_to_engine'], 
         _args[2], _args[3], _args[4], _args[5], _args[6], 
-        x1, x2, x3)
+        x1, x2, x3, x4, v['a'])
 
-def fcn2min(params, x1, x2, x3, data, _args):
+def fcn2min(params, x1, x2, x3, x4, data, _args):
     v = params.valuesdict()
-    model = fcn(v, x1, x2, x3, _args)
+    model = fcn(v, x1, x2, x3, x4, _args)
     return model - data
 
 # create a set of Parameters
@@ -36,11 +36,13 @@ params.add('temperature_increase_when_engine_off', value=0)
 params.add('engine_coolant_flow', value=0.015)
 params.add('engine_coolant_constant', value=0.4)
 params.add('heat_to_engine', value=0.35)
+params.add('a', value=-0.001)
 
 def run_main():
     
     
     x1, x2, x3 = dw.fuel_consumptions.values, dw.engine_powers_out.values, dw.engine_speeds_out.values
+    x4 = dw.velocities.values
     data = dw.engine_coolant_temperatures.values #.diff().fillna(0)
 
     fuel_type = d['fuel_type']
@@ -60,13 +62,13 @@ def run_main():
     # do fit, here with leastsq model
     _t0 = datetime.datetime.now()
 
-    result = minimize(fcn2min, params, args=(x1, x2, x3, data, _args))
+    result = minimize(fcn2min, params, args=(x1, x2, x3, x4, data, _args))
     
     _t1 = datetime.datetime.now()
     print("Elapsed time: %s"%(_t1-_t0))
     
     # calculate final result
-    final = fcn(result.params, x1, x2, x3, _args)
+    final = fcn(result.params, x1, x2, x3, x4, _args)
     
     # write error report
     report_fit(result.params)
@@ -107,7 +109,7 @@ def calculate_coolant_temperatures(
         temperature_max, temperature_threshold, initial_engine_temperature, temperature_increase_when_engine_off,
         engine_coolant_flow, engine_coolant_constant, heat_to_engine, engine_fuel_lower_heating_value,
         engine_coolant_heat_capacity, engine_coolant_equiv_mass, engine_heat_capacity, engine_mass,
-        fuel_consumptions, engine_powers_out, engine_speeds_out):
+        fuel_consumptions, engine_powers_out, engine_speeds_out, velocities, a):
     """
     Check CO2MPAS Parametric.
     :return:
@@ -129,9 +131,10 @@ def calculate_coolant_temperatures(
     fc = fuel_consumptions
     p = engine_powers_out
     n = engine_speeds_out
+    v = velocities
 
     def calculate_dQ(
-            fc, p, t, t0, tthres, flhv, h2e, cmcp, cflow):
+            fc, p, t, t0, tthres, flhv, h2e, cmcp, cflow, a, v):
         if fc <= 0:
             dQ = 0
         else:
@@ -139,7 +142,7 @@ def calculate_coolant_temperatures(
             dQ = fh * h2e
             if t > tthres:
                 dQ -= cmcp * ((t - t0) * cflow)
-        return dQ
+        return dQ + a*v**2
 
     t = []
     l = len(fc)
@@ -154,7 +157,7 @@ def calculate_coolant_temperatures(
 
         elif n[i] > 0:
             dQ = calculate_dQ(
-                    fc[i - 1], p[i - 1], t_ii, t0, tthres, flhv, h2e, cmcp, cflow)
+                    fc[i - 1], p[i - 1], t_ii, t0, tthres, flhv, h2e, cmcp, cflow, a, v[i - 1])
             t_i = t_ii + dQ / (em * ecp)
 
         else:
