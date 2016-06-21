@@ -16,152 +16,121 @@ dn = pd.read_excel(fn, shts[0], index_col=0, skiprows=[0,2])
 dw = pd.read_excel(fn, shts[1], index_col=0, skiprows=[0,2])
 
 # define objective function: returns the array to be minimized
-def fcn(v, x1, x2, x3, x4, _args):
+def fcn(v, x1, x2, x3, t_init):
     return calculate_coolant_temperatures(
-        _args[0], _args[7], _args[1], 
-        v['temperature_increase_when_engine_off'], v['engine_coolant_flow'], 
-        v['engine_coolant_constant'], v['heat_to_engine'], 
-        _args[2], _args[3], _args[4], _args[5], _args[6], 
-        x1, x2, x3, x4, v['a'])
+        v['temperature_threshold'], t_init, v['temperature_increase_when_engine_off'],
+        x1, x2, x3, v['c1'], v['c2'], v['c3'], v['c4'], v['c5'], v['c6'])
 
-def fcn2min(params, x1, x2, x3, x4, data, _args):
+def fcn2min(params, x1, x2, x3, data, t_init):
     v = params.valuesdict()
-    model = fcn(v, x1, x2, x3, x4, _args)
+    model = fcn(v, x1, x2, x3, t_init)
     return model - data
 
 # create a set of Parameters
 params = Parameters()
-# params.add('temperature_threshold', value=75)
+params.add('temperature_threshold', value=75)
 params.add('temperature_increase_when_engine_off', value=0)
-params.add('engine_coolant_flow', value=0.015)
-params.add('engine_coolant_constant', value=0.4)
-params.add('heat_to_engine', value=0.35)
-params.add('a', value=-0.001)
+params.add('c1', value=1)
+params.add('c2', value=0.33)
+params.add('c3', value=-0.01)
+params.add('c4', value=1)
+params.add('c5', value=0.1)
+params.add('c6', value=0.1)
 
 def run_main():
     
     
-    x1, x2, x3 = dw.fuel_consumptions.values, dw.engine_powers_out.values, dw.engine_speeds_out.values
-    x4 = dw.velocities.values
+    x1, x2, x3 = dw.fuel_consumptions.values, dw.engine_speeds_out.values, dw.velocities.values
     data = dw.engine_coolant_temperatures.values #.diff().fillna(0)
 
-    fuel_type = d['fuel_type']
-    engine_max_power = eval(d['engine_max_power'])
-    engine_fuel_lower_heating_value = eval(d['engine_fuel_lower_heating_value'])
-    engine_coolant_heat_capacity, engine_coolant_equiv_mass, engine_heat_capacity, engine_mass = \
-        get_thermal_model_arguments(fuel_type, engine_max_power)
-    
     temperature_threshold = 95
     temperature_max, initial_engine_temperature = data.max(), data[0]
-    _args = [temperature_max, initial_engine_temperature, \
-             engine_fuel_lower_heating_value, engine_coolant_heat_capacity, \
-             engine_coolant_equiv_mass, engine_heat_capacity, engine_mass,\
-             temperature_threshold]
+    t_init = initial_engine_temperature 
 
     
     # do fit, here with leastsq model
     _t0 = datetime.datetime.now()
 
-    result = minimize(fcn2min, params, args=(x1, x2, x3, x4, data, _args))
+    result = minimize(fcn2min, params, args=(x1, x2, x3, data, t_init))
     
     _t1 = datetime.datetime.now()
     print("Elapsed time: %s"%(_t1-_t0))
     
     # calculate final result
-    final = fcn(result.params, x1, x2, x3, x4, _args)
+    final = fcn(result.params, x1, x2, x3, t_init)
     
     # write error report
     report_fit(result.params)
     
+    
+    
+    n1, n2, n3, = dn.fuel_consumptions.values, dn.engine_speeds_out.values, dn.velocities.values
+    nedc_data = dn.engine_coolant_temperatures.values
+    nedc_t_init = nedc_data[0]
+    nedc_final = fcn(result.params, n1, n2, n3, nedc_t_init)
+
     # try to plot results
     try:
         import pylab
         pylab.plot(data, 'k+')
         pylab.plot(final, 'r')
+        pylab.plot(nedc_data, 'g+')
+        pylab.plot(nedc_final, 'b')
         pylab.show()
     except:
         pass
-
-def get_thermal_model_arguments(
-        fuel_type, engine_max_power):
-    """
-    Check CO2MPAS Parametric.
-    :return:
-        Thermal model related empirical arguments: coolant heat capacity [kJ/kg], coolant equivalent mass [kg],
-        engine heat capacity [kJ/kg], engine mass [kg].
-    :rtype: float, float, float, float
-    """
-
-    eng_mass = (0.4208*engine_max_power + 60)*(1 if fuel_type == 'gasoline' else 1.1)
-
-    # Keys: 'coolant', 'oil', 'crankcase', 'cyl_head', 'pistons', 'crankshaft'
-    mval = [0.04*eng_mass, 0.055*eng_mass, 0.18*eng_mass, 0.09*eng_mass, 0.025*eng_mass, 0.08*eng_mass]
-    cpval = [0.85*4186, 2090, 526, 940, 940, 526]
-
-
-    weighted_eng_mass = sum(mval)
-    weighted_eng_heat_capacity = sum([a*b for a,b in zip(mval, cpval)]) / weighted_eng_mass
-
-    return cpval[0], mval[0], weighted_eng_heat_capacity, weighted_eng_mass
-
+    
 
 def calculate_coolant_temperatures(
-        temperature_max, temperature_threshold, initial_engine_temperature, temperature_increase_when_engine_off,
-        engine_coolant_flow, engine_coolant_constant, heat_to_engine, engine_fuel_lower_heating_value,
-        engine_coolant_heat_capacity, engine_coolant_equiv_mass, engine_heat_capacity, engine_mass,
-        fuel_consumptions, engine_powers_out, engine_speeds_out, velocities, a):
+        temperature_threshold, initial_engine_temperature, temperature_increase_when_engine_off,
+        fuel_consumptions, engine_speeds_out, velocities, c1, c2, c3, c4, c5, c6):
     """
     Check CO2MPAS Parametric.
     :return:
         Engine coolant temperature vector [oC].
     :rtype: np.array
     """
-    tmax = temperature_max
     tthres = temperature_threshold
     t0 = initial_engine_temperature
     tgrad = temperature_increase_when_engine_off
-    cflow = engine_coolant_flow
-    ccnst = engine_coolant_constant
-    ccp = engine_coolant_heat_capacity
-    cm = engine_coolant_equiv_mass
-    ecp = engine_heat_capacity
-    em = engine_mass
-    h2e = heat_to_engine
-    flhv = engine_fuel_lower_heating_value
     fc = fuel_consumptions
-    p = engine_powers_out
     n = engine_speeds_out
     v = velocities
 
     def calculate_dQ(
-            fc, p, t, t0, tthres, flhv, h2e, cmcp, cflow, a, v):
+            fc, t, tthres, v, e0, ie0, c2, c3, c4, c5, c6):
         if fc <= 0:
-            dQ = 0
+            dQ = 0; e = e0; ie = ie0
         else:
-            fh = fc * flhv
-            dQ = fh * h2e
+            dQ = c2 * fc
+            dQ -= c3 * (v/3600)**2 # Check using accelerations instead of velocities
             if t > tthres:
-                dQ -= cmcp * ((t - t0) * cflow)
-        return dQ + a*v**2
+                e = t - tthres
+                de = e - e0 # This will work only in 1Hz, we need time
+                ie = e + ie0
+                dQ -= c4 * e + c5 * de + c6 * ie
+            else:
+                e = e0
+                ie = ie0
+                
+        return dQ, e, ie
 
     t = []
     l = len(fc)
 
-    cmcp = ccp*cm
-
     t_ii = t0
+    e, ie = 0, 0
     for i in range(l):
 
-        if (t_ii >= tmax) or ((t_ii > tthres) and (p[i] <= 0)):
-            t_i = t_ii - ccnst * (t_ii - tthres) / (tmax - tthres)
-
-        elif n[i] > 0:
-            dQ = calculate_dQ(
-                    fc[i - 1], p[i - 1], t_ii, t0, tthres, flhv, h2e, cmcp, cflow, a, v[i - 1])
-            t_i = t_ii + dQ / (em * ecp)
+        if n[i] > 0:
+            if t_ii == tthres: ie = 0
+            dQ, e, ie = calculate_dQ(
+                    fc[i - 1], t_ii, tthres, v[i - 1], e, ie, c2, c3, c4, c5, c6)
+        
+            t_i = t_ii + dQ / c1
 
         else:
-            t_i = t_ii + tgrad
+            t_i = t_ii + tgrad * t_ii
 
         t_ii = t_i
         t.append(t_i)
