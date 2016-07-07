@@ -5,39 +5,41 @@ from datetime import datetime
 
 
 shts = ['av_missing_powers_pos_pow',
-        'co2_emission',
-        'fuel_consumption',
-        'max_power_required',
-        'sufficient_power',
-        'av_vel_pos_mov_pow',
-        'av_pos_motive_powers',
-        'sec_pos_mov_pow',
         'av_neg_motive_powers',
-        'sec_neg_mov_pow',
         'av_pos_accelerations',
-        'av_engine_speeds_out_pos_pow',
         'av_pos_engine_powers_out',
+        'av_pos_motive_powers',
+        'av_vel_pos_mov_pow',
+        'co2_emission',
+        'max_power_required',
+        'specific_fuel_consumption',
+        'sufficient_power',
+        'time_percentage_neg_mov_pow',
+        'time_percentage_pos_mov_pow',
         'willans_a',
         'willans_b',
-        'specific_fuel_consumption',
         'willans_efficiency',
-        'time_percentage_pos_mov_pow',
-        'time_percentage_neg_mov_pow']
+#         'fuel_consumption',
+#         'sec_pos_mov_pow',
+#         'sec_neg_mov_pow',
+#         'av_engine_speeds_out_pos_pow',
+        ]
 
 refs = {'Ysc': "A2:A3",
-        'SSc': "C2:D16",
-        'theta': "F2:F16",
-        'beta': "H2:H17",
-        'gamma': "J2:J1281",
-        'S': "L2:Z1281"}
+        'SSc': "C2:D13", #"C2:D16",
+        'theta': "F2:F13", #"F2:F16",
+        'beta': "H2:H14", #"H2:H17",
+        'gamma': "J2:J1025", #"J2:J1281",
+        'S': "L2:W1025", #"L2:Z1281",
+        }
 
 
 
 def main():
 
-    f = "MGT_par.xlsx"
-    fin = "inKrig_MGT.csv"
-    fout = "outKrig_MGT_Python.csv"
+    f = "DT_MT_par.xlsx"
+    fin = "DT_MT_in.csv"
+    fout = "DT_MT_out_Python.csv"
 
     dfins = pd.read_csv(fin)
 #     dfins = dfins.ix[:1000, :]
