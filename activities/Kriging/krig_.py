@@ -4,6 +4,39 @@ from datetime import datetime
 
 
 
+#################################################
+################## E R R O R ####################
+#################################################
+"""
+Checking the new Kriging results / the calibrated *_par files it seems 
+that the names of the sheets do not represent the correct output parameters:
+
+Sheet name: Parameter
+---
+av_missing_powers_pos_pow: av_engine_speeds_out_pos_pow
+av_neg_motive_powers: av_missing_powers_pos_pow
+av_pos_accelerations: av_neg_motive_powers
+av_pos_engine_powers_out: av_pos_accelerations
+av_pos_motive_powers: av_pos_engine_powers_out
+av_vel_pos_mov_pow: av_pos_motive_powers
+co2_emission: av_vel_pos_mov_pow
+max_power_required: co2_emission
+specific_fuel_consumption: max_power_required
+sufficient_power: specific_fuel_consumption
+time_percentage_neg_mov_pow: sufficient_power
+time_percentage_pos_mov_pow: time_percentage_neg_mov_pow
+willans_a: time_percentage_pos_mov_pow
+willans_b: willans_a
+willans_efficiency: willans_b
+---
+
+, while it seems that the actual willans_efficiency parameter is missing.
+"""
+#################################################
+#################################################
+
+
+
 shts = ['av_missing_powers_pos_pow',
         'av_neg_motive_powers',
         'av_pos_accelerations',
@@ -35,6 +68,7 @@ refs = {'Ysc': "A2:A3",
 
 
 
+
 def main():
 
     f = "DT_MT_par.xlsx"
@@ -42,7 +76,7 @@ def main():
     fout = "DT_MT_out_Python.csv"
 
     dfins = pd.read_csv(fin)
-#     dfins = dfins.ix[:1000, :]
+    dfins = dfins.ix[:1000, :]
     dfsplit = np.array_split(dfins, 100)
 
     sh = shts[0]
