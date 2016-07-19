@@ -72,12 +72,12 @@ refs = {'Ysc': "A2:A3",
 def main():
 
     f = "DT_MT_par.xlsx"
-    fin = "DT_MT_in.csv"
+    fin = "test_in.csv" #"DT_MT_in.csv"
     fout = "DT_MT_out_Python.csv"
 
     dfins = pd.read_csv(fin)
     dfins = dfins.ix[:1000, :]
-    dfsplit = np.array_split(dfins, 100)
+    dfsplit = np.array_split(dfins, 1)#100)
 
     sh = shts[0]
     dFL = pd.DataFrame(columns = shts)
