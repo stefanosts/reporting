@@ -67,7 +67,7 @@ refs = {'Ysc': "A2:A3",
         }
 
 
-
+shts = ['co2_emission']
 
 def main():
 
